@@ -43,17 +43,12 @@ main{max-width:980px;margin:auto;padding:0 16px 64px}.tabs{display:grid;grid-tem
 
     <section class="sim-card">
       <div class="toolbar">
-        <div class="toolgroup" id="sourceTools" aria-label="配置ツール">
-          <button class="tool active positive" data-tool="positive">＋ 電荷</button>
-          <button class="tool negative" data-tool="negative">− 電荷</button>
-          <button class="tool" data-tool="move">↔ 動かす</button>
-          <button class="tool danger" data-tool="delete">× 消す</button>
-        </div>
         <div class="force-top-control" id="fieldTopControl">
           <label for="sourceCharge">電場をつくる電荷 Q</label>
           <input id="sourceCharge" type="range" min="-5" max="5" value="1" step="1">
           <output id="sourceChargeOut">＋1</output>
           <span>相対値</span>
+          <button id="placeSourceBtn" class="tool positive">電荷を置く</button>
         </div>
         <div class="force-top-control" id="forceTopControl" hidden>
           <label for="testCharge">置く電荷 q</label>
@@ -67,7 +62,7 @@ main{max-width:980px;margin:auto;padding:0 16px 64px}.tabs{display:grid;grid-tem
 
       <div class="canvas-wrap">
         <canvas id="simCanvas" aria-label="電場シミュレーション"></canvas>
-        <div class="canvas-hint" id="canvasHint">空いている場所をタップして＋電荷を置こう</div>
+        <div class="canvas-hint" id="canvasHint">Qの電気量を選び、「電荷を置く」を押そう</div>
         <div class="legend">
           <span><i class="dot plus"></i>正電荷</span>
           <span><i class="dot minus"></i>負電荷</span>
@@ -85,17 +80,17 @@ main{max-width:980px;margin:auto;padding:0 16px 64px}.tabs{display:grid;grid-tem
 
     <section class="insight" id="insight">
       <div class="bulb">!</div>
-      <div><h3>ここを確認</h3><p id="insightText">電荷を置いただけで、その周囲には電場ができます。まだ試験電荷は置いていません。</p></div>
+      <div><h3>ここを確認</h3><p id="insightText">まだ電荷がない空間には、このモデルでは電場は表示されません。Qを選んで電荷を置いてみましょう。</p></div>
     </section>
 
   </main>
   <script>
 const canvas=document.getElementById('simCanvas'),ctx=canvas.getContext('2d');
-const tabs=[...document.querySelectorAll('.tab')],tools=[...document.querySelectorAll('.tool')];
-let mode='field',tool='positive',charges=[],probe=null,probeVisible=true,drag=null,dpr=1,W=0,H=0;
+const tabs=[...document.querySelectorAll('.tab')];
+let mode='field',charges=[],probe=null,probeVisible=true,drag=null,dpr=1,W=0,H=0;
 const $=id=>document.getElementById(id);
 const lessons={
- field:{k:'STEP 1 · FIELD',t:'電場は「＋1が受ける力」で見る',p:'電荷Qの周囲に、正の試験電荷＋1を置いたと考えます。Qを変えると、電場Eの向きと大きさがどう変わるか確かめましょう。',f:'E = F / q',i:'黄色い＋1は、電場を目で見るための仮想的な試験電荷です。Qの大きさを増すと電場は強くなり、Qの符号を変えると電場の向きが反対になります。',hint:'Qを変えたり、黄色い＋1を動かしたりしてみよう'},
+ field:{k:'STEP 1 · FIELD',t:'電荷を置くと、空間に電場ができる',p:'まずQの電気量を選び、「電荷を置く」を押します。電荷Qの周囲に、正の試験電荷＋1を置いたと考えて電場を見てみましょう。',f:'E = F / q',i:'黄色い＋1は、電場を目で見るための仮想的な試験電荷です。Qの大きさを増すと電場は強くなり、Qの符号を変えると電場の向きが反対になります。',hint:'Qを変えたり、黄色い＋1を動かしたりしてみよう'},
  force:{k:'STEP 2 · FORCE',t:'電場の中に電荷を置くと、力を受ける',p:'置く電荷qの符号と大きさを変えよう。電場Eは同じでも、電気力Fの向きと大きさは変化します。',f:'F = qE',i:'正電荷には電場と同じ向き、負電荷には電場と反対向きの力が働きます。qを2倍にすれば力の矢印も2倍の長さになります。',hint:'上のスライダーで電荷qを変えてみよう'}
 };
 function resize(){const r=canvas.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
@@ -112,19 +107,21 @@ function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#fafbfc';ctx.fillRect(0,0,
 function drawCharge(c){const mobile=W<600,radius=mobile?16+Math.abs(c.q)*4.5:12+Math.abs(c.q)*4;ctx.save();ctx.shadowColor='rgba(0,0,0,.16)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;ctx.beginPath();ctx.arc(c.x,c.y,radius,0,Math.PI*2);ctx.fillStyle=c.q>0?'#ed5a4f':c.q<0?'#2878d4':'#7d858c';ctx.fill();ctx.restore();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();if(c.q===0){ctx.font='800 16px Meiryo, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.fillText('0',c.x,c.y)}else{ctx.moveTo(c.x-8,c.y);ctx.lineTo(c.x+8,c.y);if(c.q>0){ctx.moveTo(c.x,c.y-8);ctx.lineTo(c.x,c.y+8)}ctx.stroke()}}
 function forceArrow(x,y,dx,dy,radius,color,label,scale=1){const m=Math.hypot(dx,dy);if(m<1e-8||scale<=0)return;const mobile=W<600,ux=dx/m,uy=dy/m,start=radius+(mobile?8:5),base=(mobile?34:28)+Math.min(mobile?13:10,Math.log1p(m*12000)*(mobile?2.8:2.3)),len=Math.min(mobile?190:175,base*scale),end=start+len,a=mobile?14:11;ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=mobile?6.5:5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x+ux*start,y+uy*start);ctx.lineTo(x+ux*end,y+uy*end);ctx.stroke();ctx.beginPath();ctx.moveTo(x+ux*end,y+uy*end);ctx.lineTo(x+ux*end-ux*a-uy*a*.7,y+uy*end-uy*a+ux*a*.7);ctx.lineTo(x+ux*end-ux*a+uy*a*.7,y+uy*end-uy*a-ux*a*.7);ctx.closePath();ctx.fill();ctx.font=`800 ${mobile?18:15}px Meiryo, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,x+ux*(end+16),y+uy*(end+16));ctx.restore()}
 function drawProbe(){const f=fieldAt(probe.x,probe.y),q=+($('testCharge').value),isForce=mode==='force';const mobile=W<600,radius=isForce?(mobile?16+Math.abs(q)*4.5:12+Math.abs(q)*4):(mobile?20:15);ctx.save();ctx.globalAlpha=mode==='field'?.72:1;ctx.shadowColor='rgba(0,0,0,.16)';ctx.shadowBlur=7;ctx.shadowOffsetY=2;ctx.beginPath();ctx.arc(probe.x,probe.y,radius,0,Math.PI*2);ctx.fillStyle=isForce?(q>0?'#ed5a4f':q<0?'#2878d4':'#7d858c'):'#f3b63f';ctx.fill();ctx.restore();ctx.strokeStyle=isForce?'#fff':'#624d12';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle=isForce?'#fff':'#4d3a08';ctx.font=`800 ${isForce?Math.max(mobile?17:14,radius):mobile?15:12}px Meiryo, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(isForce?(q>0?'+':q<0?'−':'0'):'+1',probe.x,probe.y-1);if(isForce){if(q!==0)forceArrow(probe.x,probe.y,f.ex*Math.sign(q),f.ey*Math.sign(q),radius,q>0?'#c92f2a':'#185da8','F',Math.abs(q))}else{const sourceStrength=Math.abs(charges[0]?.q||0);if(sourceStrength>0)forceArrow(probe.x,probe.y,f.ex/sourceStrength,f.ey/sourceStrength,radius,'#13866f','E',sourceStrength)}}
-function updateReadout(){if(!probe||!probeVisible){$('pointReadout').textContent='試験電荷なし';$('fieldReadout').textContent=charges.length?'空間に存在':'—';return}const f=fieldAt(probe.x,probe.y),q=+($('testCharge').value);$('pointReadout').textContent=`(${Math.round(probe.x)}, ${Math.round(probe.y)})`;$('fieldReadout').textContent=`${(f.e*10000).toFixed(2)}（相対値）`;$('forceReadout').textContent=`${(f.e*Math.abs(q)*10000).toFixed(2)} ／ ${q<0?'電場と反対':q>0?'電場と同じ':'力なし'}${q===0?'':'向き'}`}
-function setMode(m){mode=m;tabs.forEach(b=>b.classList.toggle('active',b.dataset.mode===m));const l=lessons[m];$('lessonKicker').textContent=l.k;$('lessonTitle').textContent=l.t;$('lessonText').textContent=l.p;$('formula').textContent=l.f;$('insightText').textContent=l.i;$('canvasHint').textContent=l.hint;if(!probe)probe={x:W*.72,y:H*.55};if(m==='force')probeVisible=true;$('probeLegend').hidden=false;$('probeToggle').hidden=m!=='field';$('probeToggle').textContent=probeVisible?'試験電荷を隠す':'試験電荷を表示';$('sourceTools').hidden=true;$('fieldTopControl').hidden=m!=='field';$('forceTopControl').hidden=m!=='force';$('forceBox').hidden=m!=='force';draw()}
+function updateReadout(){if(!charges.length){$('pointReadout').textContent='電荷Qを置いてください';$('fieldReadout').textContent='—';$('forceReadout').textContent='—';return}if(!probe||!probeVisible){$('pointReadout').textContent='試験電荷なし';$('fieldReadout').textContent='空間に存在';return}const f=fieldAt(probe.x,probe.y),q=+($('testCharge').value);$('pointReadout').textContent=`(${Math.round(probe.x)}, ${Math.round(probe.y)})`;$('fieldReadout').textContent=`${(f.e*10000).toFixed(2)}（相対値）`;$('forceReadout').textContent=`${(f.e*Math.abs(q)*10000).toFixed(2)} ／ ${q<0?'電場と反対':q>0?'電場と同じ':'力なし'}${q===0?'':'向き'}`}
+function setMode(m){if(m==='force'&&!charges.length){$('canvasHint').textContent='まず「電場」でQを選び、電荷を置こう';return}mode=m;tabs.forEach(b=>b.classList.toggle('active',b.dataset.mode===m));const l=lessons[m];$('lessonKicker').textContent=l.k;$('lessonTitle').textContent=l.t;$('lessonText').textContent=l.p;$('formula').textContent=l.f;$('insightText').textContent=charges.length?l.i:'まだ電荷がない空間には、このモデルでは電場は表示されません。Qを選んで電荷を置いてみましょう。';$('canvasHint').textContent=charges.length?l.hint:'Qの電気量を選び、「電荷を置く」を押そう';if(charges.length&&!probe)probe={x:W*.72,y:H*.55};if(m==='force')probeVisible=true;$('probeLegend').hidden=!charges.length;$('probeToggle').hidden=m!=='field'||!charges.length;$('probeToggle').textContent=probeVisible?'試験電荷を隠す':'試験電荷を表示';$('fieldTopControl').hidden=m!=='field';$('forceTopControl').hidden=m!=='force';$('forceBox').hidden=m!=='force';draw()}
 function pointerPos(e){const r=canvas.getBoundingClientRect(),p=e.touches?e.touches[0]:e;return{x:p.clientX-r.left,y:p.clientY-r.top}}
 function nearest(p){let best=null,d=28;for(const c of charges){const nd=Math.hypot(c.x-p.x,c.y-p.y);if(nd<d){best=c;d=nd}}if(probe&&probeVisible&&Math.hypot(probe.x-p.x,probe.y-p.y)<32)return{probe:true};return best}
-function down(e){e.preventDefault();const p=pointerPos(e),n=nearest(p);if(mode==='force'){if(n?.probe)drag={probe:true};else if(!n&&probeVisible)probe={x:p.x,y:p.y};draw();return}if(n){if(tool==='delete'&&!n.probe){charges=charges.filter(c=>c!==n);draw();return}drag=n.probe?{probe:true}:n;return}if(tool==='positive'||tool==='negative'){const c={x:p.x,y:p.y,q:tool==='positive'?1:-1};if(mode==='field')charges=[c];else charges.push(c);$('canvasHint').style.opacity=.2}else if(probeVisible){probe={x:p.x,y:p.y}}draw()}
+function down(e){e.preventDefault();if(!charges.length)return;const p=pointerPos(e),n=nearest(p);if(mode==='force'){if(n?.probe)drag={probe:true};else if(!n&&probeVisible)probe={x:p.x,y:p.y};draw();return}if(n){drag=n.probe?{probe:true}:n;return}if(probeVisible)probe={x:p.x,y:p.y};draw()}
 function move(e){if(!drag)return;e.preventDefault();const p=pointerPos(e);if(drag.probe)probe=p;else{drag.x=p.x;drag.y=p.y}draw()}
 function up(){drag=null}
 canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
-tabs.forEach(b=>b.onclick=()=>setMode(b.dataset.mode));tools.forEach(b=>b.onclick=()=>{tool=b.dataset.tool;tools.forEach(x=>x.classList.toggle('active',x===b));$('canvasHint').textContent=tool==='delete'?'消したい電荷をタップ':tool==='move'?'電荷や試験電荷をドラッグ':'空いている場所をタップして電荷を置こう'});
-$('resetBtn').onclick=()=>{charges=[{x:W*.34,y:H*.5,q:1}];probe={x:W*.72,y:H*.5};probeVisible=true;$('sourceCharge').value=1;$('sourceChargeOut').textContent='＋1';$('testCharge').value=1;$('testChargeOut').textContent='＋1';$('probeToggle').textContent='試験電荷を隠す';$('canvasHint').textContent=lessons[mode].hint;draw()};$('testCharge').oninput=e=>{$('testChargeOut').textContent=(+e.target.value>0?'＋':'')+e.target.value;draw()};
-$('sourceCharge').oninput=e=>{const q=+e.target.value;if(!charges.length)charges=[{x:W*.34,y:H*.5,q}];else charges[0].q=q;$('sourceChargeOut').textContent=(q>0?'＋':'')+q;draw()};
+tabs.forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+function placeSource(){const q=+$('sourceCharge').value;charges=[{x:W*.34,y:H*.5,q}];probe={x:W*.72,y:H*.55};probeVisible=true;tabs.find(b=>b.dataset.mode==='force').disabled=false;$('probeLegend').hidden=false;$('probeToggle').hidden=false;$('placeSourceBtn').textContent='電荷を置き直す';$('canvasHint').textContent=lessons[mode].hint;$('insightText').textContent=lessons[mode].i;draw()}
+$('placeSourceBtn').onclick=placeSource;
+$('resetBtn').onclick=()=>{charges=[];probe=null;probeVisible=true;$('sourceCharge').value=1;$('sourceChargeOut').textContent='＋1';$('testCharge').value=1;$('testChargeOut').textContent='＋1';$('placeSourceBtn').textContent='電荷を置く';tabs.find(b=>b.dataset.mode==='force').disabled=true;setMode('field');$('canvasHint').textContent='Qの電気量を選び、「電荷を置く」を押そう';$('insightText').textContent='まだ電荷がない空間には、このモデルでは電場は表示されません。Qを選んで電荷を置いてみましょう。';draw()};$('testCharge').oninput=e=>{$('testChargeOut').textContent=(+e.target.value>0?'＋':'')+e.target.value;draw()};
+$('sourceCharge').oninput=e=>{const q=+e.target.value;$('sourceChargeOut').textContent=(q>0?'＋':'')+q;if(charges.length){charges[0].q=q;draw()}};
 $('probeToggle').onclick=()=>{probeVisible=!probeVisible;if(probeVisible&&!probe)probe={x:W*.72,y:H*.5};$('probeToggle').textContent=probeVisible?'試験電荷を隠す':'試験電荷を表示';$('canvasHint').textContent=probeVisible?lessons[mode].hint:'試験電荷がなくても、電場は空間に残っている';draw()};
-addEventListener('resize',resize);resize();charges=[{x:W*.34,y:H*.5,q:1}];probe={x:W*.72,y:H*.5};setMode('field');
+addEventListener('resize',resize);resize();tabs.find(b=>b.dataset.mode==='force').disabled=true;setMode('field');
 
   </script>
 </body>
